@@ -190,11 +190,7 @@ class GaussianMixture(torch.nn.Module):
 
         weighted_log_prob = self._estimate_log_prob(x) + torch.log(self.pi)
 
-        if probs:
-            p_k = torch.exp(weighted_log_prob)
-            return torch.squeeze(p_k / (p_k.sum(1, keepdim=True)))
-        else:
-            return torch.squeeze(torch.max(weighted_log_prob, 1)[1].type(torch.LongTensor))
+        return torch.exp(weighted_log_prob)
 
 
     def predict_proba(self, x):
@@ -206,7 +202,24 @@ class GaussianMixture(torch.nn.Module):
             y:          torch.LongTensor (n)
         """
         return self.predict(x, probs=True)
+    
+    def forward(self, grid_p, robot, obstacle):
+        grid = grid_p.clone()
+        p = torch.zeros((grid.size(0)))
+        for i in range(grid.size(0)):
+            robot.send_new_absolute_configuration(grid_p[i].clone().detach())
+            p[i] = robot.link1.gmm_model.predict(obstacle.clone())
+        x = torch.unique(grid[:, 0])
+        y = torch.unique(grid[:, 1])
+        z = torch.zeros_like(p[:x.size(0)**2].reshape((x.size(0), -1)))
+        for i, q1 in enumerate(x):
+            for j, q2 in enumerate(y):
+                closest_index = torch.argmin(torch.linalg.norm(torch.tensor([q1, q2])-grid, dim=1))
+                z[i, j] = p[closest_index]
 
+        output = torch.ravel(z).unsqueeze(1)
+        output[output>= 100] = 100
+        return torch.concat((grid_p, output), axis=1)
 
     def sample(self, n):
         """
