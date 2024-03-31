@@ -190,12 +190,10 @@ class GaussianMixture(torch.nn.Module):
 
         weighted_log_prob = self._estimate_log_prob(x) + torch.log(self.pi)
 
-        if probs:
-            p_k = torch.exp(weighted_log_prob)
-            return torch.squeeze(p_k / (p_k.sum(1, keepdim=True)))
-        else:
-            return torch.squeeze(torch.max(weighted_log_prob, 1)[1].type(torch.LongTensor))
-
+        return torch.exp(weighted_log_prob)
+    
+    def forward(self, x):
+        return self.predict(x)
 
     def predict_proba(self, x):
         """
